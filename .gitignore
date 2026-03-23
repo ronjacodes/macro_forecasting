@@ -1,4 +1,9 @@
-.Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+.DS_Store (for Mac users)
+
+renv/library/
+renv/staging/
+
+swiss_nowcast_metadata/
