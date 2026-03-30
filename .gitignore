@@ -6,5 +6,5 @@
 renv/library/
 renv/staging/
 
-swiss_nowcast_metadata/
+data/*.
 .Rproj.user
