@@ -1,10 +1,8 @@
 .Rhistory
 .RData
 .Ruserdata
-.DS_Store (for Mac users)
-
+.DS_Store
 renv/library/
 renv/staging/
-
 data/
 .Rproj.user
