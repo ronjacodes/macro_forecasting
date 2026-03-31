@@ -6,5 +6,5 @@
 renv/library/
 renv/staging/
 
-data/*.
+data/
 .Rproj.user
