@@ -3,7 +3,7 @@
 ## Project Overview
 This project analyses Swiss export dynamics using Vector Autoregression (VAR) 
 to forecast trade flows across key economic partners including Germany, China, 
-Europe, and the Americas. Data spans January 2005 to January 2026.
+Europe, and the Americas. Data spans from January 2005 to January 2026.
 
 ## Data
 The `data/` folder is not tracked by Git (too large).
