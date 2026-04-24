@@ -9,8 +9,9 @@
 #   are stationary. This informs predictor selection.
 #
 # REQUIRES:
-#   data/cleaned_nowcast.RData — produced by 01_load_nowcast.R
-#   (nowcast_long, coverage, metadata)
+#   data/swiss_nowcast_data.json
+#   data/swiss_nowcast_metadata.xlsx
+#   (no cleaned_nowcast.RData needed — built here directly)
 #
 # KEY FINDINGS:
 #   - 92 / 133 monthly series are stationary at the 5% level
@@ -23,14 +24,53 @@
 # ============================================================
 
 library(here)
+library(readxl)
+library(jsonlite)
 library(dplyr)
 library(ggplot2)
 library(tseries)
 
-load(here("data", "cleaned_nowcast.RData"))
+json_text   <- paste(readLines(here("data", "swiss_nowcast_data.json"),
+                               encoding = "UTF-8"), collapse = "")
+nowcast_raw <- fromJSON(json_text, flatten = TRUE)
+metadata    <- read_excel(here("data", "swiss_nowcast_metadata.xlsx"))
 
-# Focus on monthly series — quarterly and daily series are
-# handled separately and are not used as bridge predictors
+
+# ============================================================
+# 0. BUILD MONTHLY LONG DATA FRAME
+# ============================================================
+
+# Pull all _lvl series from the JSON, attach metadata, and
+# build a long-format data frame for exploration. We use _lvl
+# (level) variants here since we want to assess the raw series
+# before any transformation decisions are made.
+
+all_keys  <- setdiff(names(nowcast_raw), "dates")
+lvl_keys  <- all_keys[endsWith(all_keys, "_lvl")]
+
+nowcast_list <- lapply(lvl_keys, function(k) {
+  base_key <- sub("_lvl$", "", k)
+  dates    <- as.Date(nowcast_raw$dates[[k]], format = "%d.%m.%Y")
+  values   <- as.numeric(nowcast_raw[[k]])
+  data.frame(date = dates, base_key = base_key,
+             value = values, stringsAsFactors = FALSE)
+})
+
+nowcast_long <- bind_rows(nowcast_list) %>%
+  left_join(metadata, by = c("base_key" = "key"))
+
+# Coverage summary — start, end, obs count, NA count per series
+coverage <- nowcast_long %>%
+  group_by(base_key, frequency) %>%
+  summarise(
+    start  = min(date),
+    end    = max(date),
+    n_obs  = n(),
+    n_na   = sum(is.na(value)),
+    .groups = "drop"
+  )
+
+# Focus on monthly series for the rest of the script
 monthly_long <- nowcast_long %>% filter(frequency == "Month")
 monthly_keys <- unique(monthly_long$base_key)
 cat("Monthly series:", length(monthly_keys), "\n")
@@ -60,7 +100,7 @@ countries <- monthly_long %>%
 for (ctry in countries) {
   plot_data <- monthly_long %>% filter(country == ctry)
   n_series  <- length(unique(plot_data$base_key))
-
+  
   if (n_series > 6) {
     p <- ggplot(plot_data, aes(x = date, y = value)) +
       geom_line(linewidth = 0.4, color = "steelblue") +
