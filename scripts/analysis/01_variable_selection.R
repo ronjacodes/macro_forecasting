@@ -53,6 +53,20 @@
 #   month off target, acceptable. swcnfbusq starts Jan 2004,
 #   constraining the estimation sample to 2004 Q1.
 #
+#   Granger causality (bivariate VAR(2), p < 0.05):
+#     swobs085q  p = 0.0002  Granger-causes GDP ✓
+#     bdiptot_g  p = 0.0003  Granger-causes GDP ✓
+#     swxsfec_   p = 0.0188  Granger-causes GDP ✓
+#     swcnfbusq  p = 0.3710  no significant result
+#     ekeusesig  p = 0.6781  no significant result
+#
+#   swcnfbusq and ekeusesig are retained despite failing the
+#   bivariate Granger test. The bivariate test does not
+#   capture their joint contribution in the full VAR, and
+#   both have strong economic rationale. Their correlation
+#   with swobs085q (CLI) likely absorbs their individual
+#   predictive content in the bivariate setting.
+#
 # ============================================================
 
 library(here)
@@ -60,8 +74,12 @@ library(jsonlite)
 library(dplyr)
 library(ggplot2)
 library(tseries)
+library(vars)
+
+select <- dplyr::select
 
 source(here("R", "data_utils.R"))
+source(here("R", "model_utils.R"))
 
 json_text   <- paste(readLines(here("data", "swiss_nowcast_data.json"),
                                encoding = "UTF-8"), collapse = "")
@@ -110,23 +128,23 @@ for (i in seq_len(nrow(candidates))) {
   k  <- candidates$base_key[i]
   jk <- candidates$json_key[i]
   s  <- series_list[[k]]
-
+  
   if (is.null(s)) {
     cat(sprintf("%-12s  NOT FOUND in JSON (key: %s)\n", k, jk))
     next
   }
-
+  
   start <- min(s$date)
   end   <- max(s$date)
   n_na  <- sum(is.na(s$value))
   ok    <- start <= as.Date("2000-01-01")
-
+  
   cat(sprintf("%-12s  %s to %s  NAs: %d  Covers 2000: %s\n",
               k,
               format(start, "%Y-%m"),
               format(end,   "%Y-%m"),
               n_na,
-              ifelse(ok, "YES ✓", "NO — note sample start")))
+              ifelse(ok, "YES \u2713", "NO — note sample start")))
 }
 
 
@@ -138,7 +156,7 @@ for (i in seq_len(nrow(candidates))) {
 # so they should pass even though their levels would not.
 
 cat("\n--- ADF stationarity tests ---\n")
-cat("(H0: unit root — p < 0.05 → stationary)\n\n")
+cat("(H0: unit root — p < 0.05 \u2192 stationary)\n\n")
 
 for (i in seq_len(nrow(candidates))) {
   k <- candidates$base_key[i]
@@ -154,7 +172,72 @@ for (i in seq_len(nrow(candidates))) {
 
 
 # ============================================================
-# 4. PLOT CANDIDATES
+# 4. GRANGER CAUSALITY
+# ============================================================
+
+# Granger causality tests whether past values of a predictor
+# contain information about future GDP growth beyond what
+# GDP's own lags already provide. A significant result
+# (p < 0.05) is statistical confirmation that the variable
+# has predictive content — supporting the economic argument
+# for including it.
+#
+# We test using a bivariate VAR(2) for each predictor vs GDP,
+# estimated on the full available sample for each pair.
+# H0: predictor does NOT Granger-cause GDP growth.
+
+cat("\n--- Granger causality tests ---\n")
+cat("(H0: predictor does not Granger-cause GDP)\n")
+cat("(p < 0.05 \u2192 reject H0 \u2192 predictor has predictive content)\n\n")
+
+gdp <- pull_series("ch_kof_modelinput_gdpos_pct_3m") %>%
+  rename(gdp = value)
+
+for (i in seq_len(nrow(candidates))) {
+  k <- candidates$base_key[i]
+  s <- series_list[[k]]
+  if (is.null(s)) next
+  
+  # Merge GDP and predictor on common quarterly dates
+  # GDP is quarterly so we aggregate the predictor first
+  pred_q <- to_quarterly(s, k)
+  merged  <- gdp %>%
+    rename(qdate = date) %>%
+    inner_join(pred_q, by = "qdate") %>%
+    filter(!is.na(gdp), !is.na(.data[[k]]))
+  
+  if (nrow(merged) < 20) {
+    cat(sprintf("%-12s  insufficient data\n", k))
+    next
+  }
+  
+  # Bivariate VAR(2) — small enough to be fast, large enough
+  # to capture typical quarterly dynamics
+  bvar <- tryCatch(
+    VAR(merged[, c("gdp", k)], p = 2, type = "const"),
+    error = function(e) NULL
+  )
+  if (is.null(bvar)) next
+  
+  # causality() tests whether the predictor block of
+  # coefficients in the GDP equation is jointly zero
+  gc <- tryCatch(
+    causality(bvar, cause = k)$Granger,
+    error = function(e) NULL
+  )
+  if (is.null(gc)) next
+  
+  p_val <- gc$p.value
+  cat(sprintf("%-12s  F = %6.3f  p = %.4f  %s\n",
+              k, gc$statistic, p_val,
+              ifelse(p_val < 0.05,
+                     "Granger-causes GDP \u2713",
+                     "no significant predictive content")))
+}
+
+
+# ============================================================
+# 5. PLOT CANDIDATES
 # ============================================================
 
 # Shaded regions mark the 2008-09 recession and 2020 COVID
