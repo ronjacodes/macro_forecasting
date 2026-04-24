@@ -7,3 +7,4 @@ renv/library/
 renv/staging/
 data/
 .Rproj.user
+data/cleaned_nowcast.RData
