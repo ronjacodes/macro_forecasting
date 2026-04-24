@@ -87,7 +87,6 @@ SAMPLE_END   <- as.Date("2025-10-01")
 
 est_data <- quarterly %>%
   filter(qdate >= SAMPLE_START, qdate <= SAMPLE_END) %>%
-  # Adding the Financial Crisis Dummy (Q4 2008 and Q1 2009)
   mutate(gfc = if_else(qdate %in% as.Date(c("2008-10-01", "2009-01-01")), 1, 0))
 
 cat("\nEstimation sample:", nrow(est_data), "quarters\n")
@@ -114,26 +113,21 @@ summary(var_mod)
 # 4. NOWCAST & PREDICTION
 # ============================================================
 
-# 1. Manually create the 2-column exogenous matrix
 exog_matrix <- as.matrix(est_data[, c("covid", "gfc")])
 
-# 2. Re-estimate the model using the vars package directly (bypassing fit_var's limitations)
 library(vars)
 var_mod <- VAR(est_data[, c("gdp", pred_names)], 
                p = p_aic, 
                type = "const", 
                exogen = exog_matrix)
 
-# 3. Create the matching forecast dummy matrix
 exog_fc <- matrix(0, nrow = 1, ncol = 2)
 colnames(exog_fc) <- colnames(exog_matrix)
 
-# 4. Run the prediction (This will now work!)
 fc_obj    <- predict(var_mod, n.ahead = 1, dumvar = exog_fc)
 gdp_lower <- fc_obj$fcst$gdp[1, "lower"]
 gdp_upper <- fc_obj$fcst$gdp[1, "upper"]
 
-# Extract and print result
 gdp_nowcast <- bridge_nowcast(var_mod, est_data, pred_avgs, pred_names, p_aic)
 cat(sprintf("  Point estimate:  %.3f%%\n", gdp_nowcast))
 cat(sprintf("  95%% interval:   [%.3f%%, %.3f%%]\n", gdp_lower, gdp_upper))
@@ -143,9 +137,6 @@ cat(sprintf("  KOF benchmark:   +0.300%% (headline GDP)\n"))
 # ============================================================
 # 5. PLOT: FITTED VS ACTUAL
 # ============================================================
-
-# Sanity check — does the VAR track actual GDP growth over
-# the estimation sample? The COVID period is shaded.
 
 fitted_gdp <- fitted(var_mod)[, "gdp"]
 
@@ -164,24 +155,20 @@ ggplot(plot_df, aes(x = date)) +
              size = 3, shape = 18) +
   geom_hline(yintercept = 0, linetype = "dotted", 
              color = "gray50") +
-  # COVID SHADING
   annotate("rect", 
            xmin = as.Date("2020-01-01"), 
            xmax = as.Date("2021-01-01"), 
            ymin = -Inf, ymax = Inf, 
            fill = "red", alpha = 0.07) +
-  # GFC SHADING (New)
   annotate("rect", 
            xmin = as.Date("2008-07-01"), 
            xmax = as.Date("2009-07-01"), 
            ymin = -Inf, ymax = Inf, 
            fill = "gray20", alpha = 0.1) +
-  # Labels for Shaded Areas
   annotate("text", x = as.Date("2009-01-01"), y = 3, label = "GFC", 
            size = 2.5, color = "gray30", fontface = "italic") +
   annotate("text", x = as.Date("2020-07-01"), y = 3, label = "COVID", 
            size = 2.5, color = "red", fontface = "italic") +
-  # Nowcast Label
   annotate("text", 
            x     = as.Date("2026-01-01"), 
            y     = gdp_nowcast + 0.3, 
