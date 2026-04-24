@@ -127,9 +127,11 @@ gdp_nowcast <- bridge_nowcast(var_mod, est_data,
                               pred_avgs, pred_names, p_aic)
 
 # Confidence interval from VAR predict() for reference
-exog_fc  <- matrix(0, nrow = 1, ncol = 1,
-                   dimnames = list(NULL, "covid"))
-fc_obj   <- predict(var_mod, n.ahead = 1, dumvar = exog_fc)
+# create the 'exog' object the model is looking for
+exog <- matrix(est_data$covid, ncol = 1, dimnames = list(NULL, "covid"))
+# create the future dummy for the forecast
+exog_fc <- matrix(0, nrow = 1, ncol = 1, dimnames = list(NULL, "covid"))
+fc_obj <- predict(var_mod, n.ahead = 1, dumvar = exog_fc)
 gdp_lower <- fc_obj$fcst$gdp[1, "lower"]
 gdp_upper <- fc_obj$fcst$gdp[1, "upper"]
 
@@ -179,3 +181,4 @@ ggplot(plot_df, aes(x = date)) +
                         "  |  Red diamond = Q1 2026 nowcast"),
        x = NULL, y = "QoQ growth (%)") +
   theme_minimal(base_size = 10)
+
