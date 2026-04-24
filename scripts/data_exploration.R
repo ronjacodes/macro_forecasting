@@ -53,10 +53,10 @@ cat("PART 1: ONS DATA\n")
 cat("============================================================\n")
 
 # --- 1.1 Load & parse ---------------------------------------
-ons_raw      <- read_excel(here("data", "ons_data_hierarchy_FS26.xlsx"),
+ons_raw <- read_excel(here("data", "ons_data_hierarchy_FS26.xlsx"),
                            sheet = "hierarchy")
 ons_raw$date <- as.Date(paste0(ons_raw$date, "-01"))
-ons_raw      <- ons_raw[order(ons_raw$date), ]
+ons_raw <- ons_raw[order(ons_raw$date), ]
 
 cat("Dimensions:   ", dim(ons_raw), "\n")
 cat("Date range:    ", format(min(ons_raw$date), "%Y-%m"),
@@ -64,8 +64,8 @@ cat("Date range:    ", format(min(ons_raw$date), "%Y-%m"),
 cat("Observations: ", nrow(ons_raw), "months\n")
 
 # --- 1.2 Hierarchy structure --------------------------------
-canton_total_cols <- paste0(CANTONS, ".total")
-origin_cols       <- paste0("total.", DESTINATIONS)
+canton_total_cols <- paste0(cantons, ".total")
+origin_cols       <- paste0("total.", destinations)
 
 cat("\n--- Hierarchy ---\n")
 cat("Level 0: total.total                  (1 series)\n")
@@ -92,7 +92,7 @@ diff_origin <- abs(ons_raw$total.total - origin_sum)
 cat("Origin totals sum to national:",
     ifelse(max(diff_origin) == 0, "YES ✓\n",
            paste("NO, max diff:", round(max(diff_origin)),
-                 "— expected: 'de','fr','it' are subsets of 'europa'\n")))
+                 "— Note: Regional variables like 'europa' likely represent the 'Rest of Europe', not the total (mutually exclusive labels). Also, Africa and Oceania are not counted separately, but most likely part of the total.\n")))
 
 # --- 1.5 Summary statistics ---------------------------------
 cat("\n--- Summary: National Total ---\n")
@@ -111,11 +111,14 @@ cat("\n--- Annual Totals (millions) ---\n")
 annual <- ons_raw %>%
   mutate(year = year(date)) %>%
   group_by(year) %>%
-  summarise(total_mio  = round(sum(total.total) / 1e6, 2),
-            pct_change = round((sum(total.total) /
-                                  lag(sum(total.total)) - 1) * 100, 1),
-            .groups = "drop")
+  summarise(total_mio = sum(total.total) / 1e6, .groups = "drop") %>%
+  mutate(
+    pct_change = round((total_mio / lag(total_mio) - 1) * 100, 1),
+    total_mio  = round(total_mio, 2)
+  )
+
 print(annual, n = 25)
+cat("Note: 2026 contains only January data (Year-to-Date), causing an artificial drop in pct_change.\n\n")
 
 # --- 1.7 Plot: National total over time ---------------------
 p1 <- ggplot(ons_raw, aes(x = date, y = total.total / 1e6)) +
@@ -163,6 +166,7 @@ p3 <- ggplot(canton_long, aes(x = date, y = stays / 1000, color = canton)) +
   labs(title    = "Top 5 Cantons by Overnight Stays",
        subtitle = "Monthly, 2005–2026",
        x = NULL, y = "Stays (thousands)", color = "Canton") +
+  facet_wrap(~canton)+
   theme_minimal() +
   theme(legend.position = "bottom")
 print(p3)
@@ -518,8 +522,8 @@ save(ons_clean,
      metadata,
      kof_data,
      kof_meta,
-     CANTONS,
-     DESTINATIONS,
+     cantons,
+     destinations,
      canton_total_cols,
      origin_cols,
      file = here("data", "cleaned_data.RData"))
