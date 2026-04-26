@@ -1,47 +1,29 @@
-# Macro Forecasting — Swiss GDP Nowcasting
-
+# Macroeconomic Forecasting — Swiss GDP, CPI & Bond Yield
 **Ronja Hegelbach & Naéla Gruber**  
-Macroeconomic Forecasting Seminar, Spring 2026  
-KOF ETH Zurich / University of Zurich
+Macroeconomic Forecasting Seminar, Spring 2026 | KOF ETH Zurich / University of Zurich  
+Supervisor: Alexander Rathke
 
 ---
 
-## Project Overview
+## Overview
 
-This project nowcasts Swiss GDP growth using Vector Autoregression (VAR) models estimated on the KOF nowcast dataset. We target **Swiss GDP excluding sporting events** (FIFA/UEFA revenues create large one-off spikes in headline GDP that cannot be predicted by economic indicators — KOF themselves use the sports-excluded series in their own nowcasting model).
+Joint VAR forecasting of three Swiss macroeconomic variables:
+- **GDP growth** — QoQ %, KOF sports-event corrected
+- **CPI inflation** — QoQ %, headline
+- **10Y bond yield change** — QoQ pp (level is I(1); first-differenced)
 
-Our baseline is a **bridge VAR**: monthly indicators are aggregated to quarterly frequency and a standard VAR is estimated. We evaluate pseudo out-of-sample performance against a naive AR(1) benchmark and compare our Q1 2026 nowcast to the KOF benchmark (+0.30% QoQ).
-
-Planned extensions include a Bayesian VAR and a mixed-frequency VAR.
+Baseline models vary lag order (p=1–5) and sample period (full 2000–2025, post-GFC 2009–2025, post-2015 2015–2025). Evaluated pseudo out-of-sample against AR(1) benchmark via expanding window (2010 Q1 – 2025 Q4, horizons h=1,2,4,8). COVID quarters (2020 Q1 – 2021 Q4) handled via exogenous dummies in the VAR and excluded from RMSE comparisons.
 
 ---
 
 ## Data
 
-The `data/` folder is not tracked by Git (too large). Download the following files and place them in a local `data/` folder:
+`data/` is not tracked by Git. Place the following files there locally:
 
-- `swiss_nowcast_data.json` — KOF nowcast predictor series (~4340 series, each with 14 transformation variants)
-- `swiss_nowcast_metadata.xlsx` — variable descriptions, sources, and frequencies (366 rows)
+- `swiss_nowcast_data.json` — KOF nowcast dataset (~4340 series)
+- `swiss_nowcast_metadata.xlsx` — variable descriptions (366 base series)
 
-### Data structure
-
-The JSON stores each series as a numeric vector under a key like `swobs085q_lvl`. Dates are stored separately under `nowcast_raw$dates[[key]]` in `DD.MM.YYYY` format — there is no shared date index. Each base series has 14 variants: `_lvl`, `_lvl_detrended`, `_pct_1m/3m/1y`, `_dif_1m/3m/1y`, and detrended versions of each.
-
-### Target variable
-
-`ch_kof_modelinput_gdpos_pct_3m` — Swiss real GDP excluding sporting events, quarter-on-quarter growth rate (%). Source: SECO via KOF. Last observed: Q4 2025 (+0.155%). Nowcast target: Q1 2026.
-
-### Selected predictors
-
-| Key | Description | Transformation |
-|-----|-------------|----------------|
-| `swobs085q` | CH OECD composite leading indicator | Level |
-| `swcnfbusq` | KOF business situation survey | Level |
-| `bdiptot_g` | German industrial production | MoM growth rate |
-| `ekeusesig` | EA economic sentiment indicator | Level |
-| `swxsfec_` | CHF/EUR exchange rate | MoM growth rate |
-
-Estimation sample: 2004 Q1 – 2025 Q4 (constrained by `swcnfbusq` which starts January 2004). COVID dummy added for 2020 Q2 and Q3.
+**VAR dataset:** Q2 2000 – Q4 2025, 103 quarterly observations.
 
 ---
 
@@ -49,77 +31,58 @@ Estimation sample: 2004 Q1 – 2025 Q4 (constrained by `swcnfbusq` which starts 
 
 ```
 macro_forecasting/
-│
-├── R/                           # shared utility functions
-│   ├── data_utils.R             # pull_series, to_quarterly,
-│   │                            # get_partial_avg, build_quarterly_panel
-│   └── model_utils.R           # bridge_nowcast, compute_metrics,
-│                                # fit_var, ar1_forecast
-│
 ├── scripts/
-│   ├── exploration/             # initial data inspection
-│   │   ├── 01_inspect.R         # raw data structure
-│   │   ├── 02_inspect_json.R    # JSON naming convention
-│   │   ├── 02_explore_nowcast.R # plots, stationarity, coverage
-│   │   └── 03_inspect_gdp.R    # GDP target variable
-│   │
-│   ├── analysis/                # main modelling pipeline
-│   │   ├── 04_variable_selection.R  # predictor selection
-│   │   ├── 05_bridge_var.R          # model estimation + Q1 2026 nowcast
-│   │   └── 06_evaluation.R          # pseudo out-of-sample evaluation
-│   │
-│   └── extensions/              # planned extensions
-│       ├── 07_bvar.R            # Bayesian VAR (Minnesota prior)
-│       ├── 08_mfvar.R           # mixed-frequency VAR
-│       └── 09_comparison.R      # model comparison + final table
-│
+│   ├── exploration/
+│   │   ├── 00_setup.R                       # packages, data loading, variable extraction
+│   │   └── 01_exploration_target_variables.R # plots, ADF, outliers, Granger tests
+│   └── models/
+│       ├── 01_var_baseline.R                # VAR(1-5) × 3 samples, forecasts
+│       ├── 02_var_baseline_evaluation.R     # AR(1) benchmark, RMSE, DM tests
+│       └── 03_var_baseline_diagnostics.R    # IRF, FEVD, rolling stability, residuals
 ├── output/
-│   ├── figures/                 # saved plots
-│   └── tables/                  # saved result tables
-│
-├── .gitignore
-├── README.md
-└── macro_forecasting.Rproj
+│   ├── figures/
+│   └── tables/
+└── README.md
 ```
 
 ---
 
 ## How to Run
 
-1. Clone the repository and place data files in `data/`
-2. Open `macro_forecasting.Rproj` in RStudio
-3. Install required packages (or restore with `renv::restore()` if lockfile present):
+Always source `00_setup.R` first — it loads all packages and data. Run scripts in numbered order within each folder.
 
 ```r
-install.packages(c("readxl", "jsonlite", "here", "dplyr", "tidyr",
-                   "lubridate", "zoo", "ggplot2", "tseries", "vars"))
+source(here("scripts", "exploration", "00_setup.R"))
 ```
 
-4. Run scripts in order within each folder — exploration first, then analysis
-
-**Note:** Load `R/data_utils.R` and `R/model_utils.R` at the top of each analysis script:
-
-```r
-source(here("R", "data_utils.R"))
-source(here("R", "model_utils.R"))
-```
+> `dplyr` is loaded last in `00_setup.R` to prevent masking by `vars`/`MASS`. All `ggsave()` and `write.csv()` calls are commented out — uncomment to save outputs.
 
 ---
 
-## Key Results (baseline bridge VAR)
+## Key Results
 
-| Sample | Relative RMSE (VAR / AR1) | VAR better? |
-|--------|--------------------------|-------------|
-| Full 2015–2025 | 0.889 | Yes |
-| Excluding COVID | 2.315 | No |
-| COVID quarters only | 0.526 | Yes |
+**Q1 2026 GDP nowcast:** +0.39% QoQ (Nowcasting Lab benchmark: +0.30%)
 
-Q1 2026 nowcast: **+1.07% QoQ** (KOF benchmark: +0.30%). Wide 95% interval [−0.74%, +2.88%] — KOF estimate lies within our uncertainty range. Gap likely reflects KOF's access to more timely and granular data.
+**Out-of-sample RMSE (ex-COVID):**
+- GDP: AR(1) beats all VAR models — classic result, simple benchmarks hard to beat
+- CPI: VAR beats AR(1) at h=4,8 (~70% of AR(1) RMSE) via bond yield channel
+- Bond: VAR better only at long horizons (h=8, ~45% of AR(1) RMSE)
+
+**Preferred model:** `post08_p3` (Post-GFC sample, p=3) — lowest GDP residual SD, only model with normal residuals in all three equations, best out-of-sample GDP at h=4.
+
+**Granger causality:** Bond yield → GDP (p=0.04) and Bond yield → CPI (p=0.004). No reverse causality.
+
+---
+
+## Planned Extensions
+
+- Extended VAR with CHF/EUR and oil price as exogenous predictors
+- Bayesian VAR with Minnesota prior
+- Full model comparison table and BoE-style fan chart
 
 ---
 
 ## Authors
 
-Ronja Hegelbach & Naéla Gruber — University of Zurich  
-Macroeconomic Forecasting Seminar, Spring 2026  
+**Ronja Hegelbach & Naéla Gruber** — University of Zurich  
 Supervisor: Alexander Rathke, KOF ETH Zurich
