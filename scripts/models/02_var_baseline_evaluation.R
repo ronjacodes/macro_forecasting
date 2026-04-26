@@ -34,12 +34,54 @@
 #              (the COVID dummies handle them in estimation, but they still
 #               dominate RMSE; excluding gives a cleaner view of normal performance)
 #
-# FINDINGS (fill in after running):
-#   AR(1) RMSE GDP   h=1: [  ]   h=4: [  ]   h=8: [  ]
-#   Best VAR GDP     h=1: [  ]   h=4: [  ]   h=8: [  ]   (model: [  ])
-#   Relative RMSE best VAR vs AR(1) GDP h=1: [  ]%
-#   DM test best VAR vs AR(1) GDP h=1: p=[  ]
-#   With vs without COVID: RMSE difference for GDP h=1: [  ] pp
+# KEY FINDINGS:
+#
+#   ── GDP ──────────────────────────────────────────────────────────────────
+#   INCLUDING COVID: All VARs appear massively better (~25% of AR1 RMSE).
+#     This is an ARTEFACT — VARs have COVID dummies, AR(1) does not.
+#     AR(1) RMSE h=1: 1.67  vs VAR_post08_p3 h=1: 0.39 → 23% relative
+#     Do NOT use this for conclusions. It is misleading.
+#
+#   EXCLUDING COVID (fair comparison):
+#     AR(1) beats ALL VAR baseline models for GDP at ALL horizons.
+#     VAR relative RMSE ranges from 103% to 136% of AR(1).
+#     Best: VAR_post08_p3 at h=4 (112%) and h=1 (103%) — barely beats AR1.
+#     DM test: VAR_post08_p3 vs AR1 at h=4: p=0.001 *** (only significant result)
+#     → Classic result: simple models are hard to beat for GDP out-of-sample.
+#     → Adding variables and lags hurts more than it helps for normal-times GDP.
+#
+#   COVID impact on AR(1) RMSE: 1.67 (incl) vs 0.377 (excl) at h=1 — factor 4.4×
+#   → COVID quarters completely dominate the evaluation if not excluded.
+#
+#   ── CPI ──────────────────────────────────────────────────────────────────
+#   Short horizons (h=1,2): VAR similar to or slightly worse than AR(1).
+#   Long horizons (h=4,8): VAR clearly beats AR(1):
+#     h=4: best model VAR_post15_p2 at 71% of AR(1) RMSE
+#     h=8: best model VAR_full_p3   at 52% of AR(1) RMSE
+#   Interpretation: VAR captures CPI persistence via bond yield channel
+#   (consistent with Granger: Bond → CPI significant at 1%).
+#   VAR_post15_p2 is the standout CPI model overall.
+#
+#   ── Bond yield ───────────────────────────────────────────────────────────
+#   Short horizons (h=1,2): ALL VARs worse than AR(1) (87–140% relative RMSE)
+#   → Yield changes at h=1 are close to white noise; VAR adds noise.
+#   Long horizons (h=4,8): VARs improve substantially:
+#     h=8: best model VAR_post08_p3 at 45% of AR(1) RMSE
+#   → Mean-reversion dynamics in VAR pay off only at longer horizons.
+#   DM: VAR_post15_p1 significantly WORSE at h=1 (p=0.06*) and h=4 (p=0.08*)
+#
+#   ── h=8 DM tests all NA ──────────────────────────────────────────────────
+#   Expected: actuals for h=8 forecasts from 2025 Q3 are not yet available.
+#   Evaluation period too short for h=8 DM tests to be meaningful.
+#
+#   ── Bottom line ──────────────────────────────────────────────────────────
+#   For GDP: AR(1) is the hardest benchmark — VAR adds little in normal times.
+#   For CPI: VAR clearly useful at medium-long horizons (h=4,8).
+#   For Bond: VAR useful only at long horizons; harmful at short horizons.
+#   → Variable-specific model selection makes sense:
+#     GDP h=1: AR(1) or VAR_post08_p3
+#     CPI h=4+: VAR_post15_p2 or VAR_full_p1
+#     Bond h=8: VAR_post08_p3
 #
 # Outputs (commented — uncomment to save):
 #   output/tables/02_rmse_table_incl_covid.csv
