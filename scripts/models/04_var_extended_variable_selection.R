@@ -62,24 +62,24 @@
 #   4. Data coverage (overlap with VAR sample Q2 2000 – Q4 2025)
 #   5. Economic rationale (no purely statistical selection)
 #
-# PLANNED VARIABLE SETS (for 05_var_extended.R):
-#   Oil price (oilbren) included as EXOGENOUS in ALL models via exogen=.
-#   Variable sets below refer to ENDOGENOUS variables only.
+# CONFIRMED VARIABLE SETS (for 05_var_extended.R):
+#   Brent oil (oilbren) passed as EXOGENOUS in ALL models via exogen=.
+#   Variable sets below are ENDOGENOUS variables only.
 #   All sets estimated at p=1,2,4 × full/post08/post15 samples.
 #
-#   4-variable models (baseline + 1):
-#   set_fx    : baseline + swxsfec_            (FX channel)
-#   set_ea    : baseline + ekeusesig           (EA demand channel)
-#   set_world : baseline + mswrld_d_           (global demand channel)
-#   set_unemp : baseline + swun_p_totq         (labour market channel)
-#   set_imp   : baseline + swimpprce           (import price / deflator channel)
-#   set_sw    : baseline + ch_kof_barometer    (Swiss leading indicator)
+#   4-variable models (baseline + 1) — isolate one channel at a time:
+#   set_fx    : baseline + swxsfec_            (FX / imported inflation)
+#   set_ea    : baseline + ekeusesig           (EA demand)
+#   set_world : baseline + mswrld_d_           (global demand / Welt Nachfrage)
+#   set_imp   : baseline + swimpprce           (price/deflator channel)
+#   set_sw    : baseline + ch_kof_barometer    (Swiss domestic leading)
+#   set_unemp : baseline + swun_p_totq         (labour market)
 #
 #   5-variable models (baseline + 2):
-#   set_small : baseline + swxsfec_ + ekeusesig
-#                → FX + EA demand (core external channels)
-#   set_sw2   : baseline + swxsfec_ + ch_kof_barometer
-#                → FX + Swiss leading
+#   set_ext   : baseline + swxsfec_ + ekeusesig
+#                → core external channels (FX + EA)
+#   set_dom   : baseline + ch_kof_barometer + swimpprce
+#                → domestic channels (leading + prices)
 #
 #   6-variable models (baseline + 3):
 #   set_medium: baseline + swxsfec_ + ekeusesig + ch_kof_barometer
@@ -88,24 +88,56 @@
 #                → external + price channel
 #
 #   7-variable models (baseline + 4):
-#   set_large : baseline + swxsfec_ + ekeusesig + ch_kof_barometer + swun_p_totq
-#                → external + domestic + labour market
+#   set_large : baseline + swxsfec_ + ekeusesig + mswrld_d_ + ch_kof_barometer
+#                → external (FX + EA + global) + domestic leading
 #
 #   8-variable models (baseline + 5):
 #   set_full  : baseline + swxsfec_ + ekeusesig + mswrld_d_ +
-#               ch_kof_barometer + swun_p_totq
-#                → all main channels
+#               swimpprce + ch_kof_barometer
+#                → all channels except labour market
 #
-#   (revise after reviewing selection results below)
+#   9-variable models (baseline + 6):
+#   set_max   : baseline + swxsfec_ + ekeusesig + mswrld_d_ +
+#               swimpprce + ch_kof_barometer + swun_p_totq
+#                → full specification including labour market
 #
-# FINDINGS (update after re-running with new candidates):
-#   Previous run (13 candidates): all stationary, Brent caused all 3 targets
-#   New candidates added: MSCI World, Swiss unemployment, import prices,
-#                         producer prices, Producer & Import PPI
-#   Oil price moved to exogenous — not evaluated here
-#   CHF/USD, IMF commodity, US ISM, KOF business survey dropped
-#   EA collinearity: keep EA ESI as primary, DE IP and EA PMI for comparison
-#   [fill in correlation and Granger results after running]
+# FINDINGS:
+#   Stationarity: ALL 12 candidates stationary (ADF p ≤ 0.05) ✓
+#
+#   Strongest contemporaneous correlations:
+#     GDP  : German IP (r=0.77), KOF barometer (r=0.64), Swiss PMI (r=0.43)
+#     CPI  : Producer & Import PPI (r=0.74), Import prices (r=0.68), PPI (r=0.67)
+#     Bond : Producer & Import PPI (r=0.47), Import prices (r=0.41), CHF/EUR (r=0.33)
+#
+#   Surprise: Price measures dominate CPI correlations — stronger than oil
+#   (oil moved to exogenous so not in this table, but this confirms the channel)
+#
+#   1-quarter lead (candidate leads target):
+#     CPI  : PPI & Import PPI (r=0.43), Swiss PMI (r=0.37), Import prices (r=0.37)
+#     GDP  : Unemployment (r=0.27), MSCI World (r=0.26), Swiss PMI (r=0.21)
+#
+#   Granger causality (min p across lags 1,2,4):
+#     2 targets: Swiss PMI ***, OECD CLI ***|*, MSCI World ***|*, KOF barometer ***|*,
+#                CHF/EUR **|**
+#     1 target:  EA PMI ***, Unemployment ***, EA ESI ***, German IP **,
+#                Import prices (bond ***), Prod & Import PPI (bond **), PPI (CPI *)
+#     0 targets: none — all candidates have at least one significant Granger result
+#
+#   FINAL SELECTION for 05_var_extended.R (endogenous variables):
+#     swxsfec_         : CHF/EUR — FX channel
+#     ekeusesig        : EA ESI — EA demand (confirmed by prof)
+#     mswrld_d_        : MSCI World — global demand (Welt Nachfrage proxy)
+#     swimpprce        : Import prices — price/deflator channel (strongest bond Granger)
+#     ch_kof_barometer : KOF barometer — Swiss leading (least collinear of three)
+#     swun_p_totq      : Unemployment — labour market (Arbeitsmarkt, prof flagged)
+#     oilbren          : Brent crude — EXOGENOUS ONLY in all models
+#
+#   DROPPED from final selection:
+#     German IP    — collinear with EA ESI, only helps GDP not CPI/bond
+#     EA PMI       — collinear with EA ESI
+#     Swiss PMI    — collinear with KOF barometer (barometer is broader)
+#     OECD CLI     — collinear with KOF barometer
+#     Producer PPI / Producer & Import PPI — collinear with import prices
 #
 # Outputs (commented — uncomment to save):
 #   output/figures/04_candidate_overview.png
