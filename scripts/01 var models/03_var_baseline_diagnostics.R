@@ -135,6 +135,13 @@ tidy_irf <- function(irf_obj, impulse, response) {
   )
 }
 
+# Short labels for panel titles to prevent overlapping
+SHORT_LABELS <- c(
+  gdp_g    = "GDP",
+  cpi_g    = "CPI",
+  bond_dif = "Bond Yield"
+)
+
 # Helper: plot a single IRF panel
 plot_irf_panel <- function(df, col_line = COL_GDP) {
   has_ci <- !all(is.na(df$lower))
@@ -153,10 +160,16 @@ plot_irf_panel <- function(df, col_line = COL_GDP) {
               inherit.aes = FALSE) +
     scale_x_continuous(breaks = seq(0, IRF_HORIZON, by = 2)) +
     labs(
-      title = sprintf("Impulse: %s → Response: %s",
-                      VAR_LABELS[df$impulse[1]],
-                      VAR_LABELS[df$response[1]]),
-      x = "Quarters after shock", y = "Response"
+      # FIX: Shortened title (e.g., "GDP -> CPI")
+      title = sprintf("%s → %s", 
+                      SHORT_LABELS[df$impulse[1]], 
+                      SHORT_LABELS[df$response[1]]),
+      x = "Quarters", 
+      y = NULL # FIX: Dropped "Response" from y-axis to save horizontal space
+    ) +
+    theme(
+      plot.title = element_text(size = 11, face = "bold", hjust = 0.5), # Centered, slightly smaller
+      axis.title.x = element_text(size = 9)
     )
 }
 
@@ -482,3 +495,4 @@ for (mname in names(focus_models)) {
 }
 
 cat("Diagnostics complete.\n")
+
