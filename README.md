@@ -32,20 +32,20 @@ Baseline models vary lag order (p=1–5) and sample period (full 2000–2025, po
 ```
 macro_forecasting/
 ├── scripts/
-│   ├── exploration/
+│   ├── 00 exploration/
 │   │   ├── 00_setup.R                       # packages, data loading, variable extraction
 │   │   └── 01_exploration_target_variables.R # plots, ADF, outliers, Granger tests
-│   └── var models/
+│   └── 01 var models/
 │       ├── 01_var_baseline.R                # VAR(1-5) × 3 samples, forecasts
 │       ├── 02_var_baseline_evaluation.R     # AR(1) benchmark, RMSE, DM tests
 │       ├── 03_var_baseline_diagnostics.R    # IRF, FEVD, rolling stability, residuals
-│       ├── 04_var_extension_variable_selection.R    #
-│       ├── 05_var_extension_estimation.R    #
-│       ├── 06_var_extension_evaluation.R    #
-│       ├── 07_var_extension_diagnostics.R   # 
-│   └── bvar models/
+│       ├── 04_var_extended_variable_selection.R    #
+│       ├── 05_var_extended_estimation.R    #
+│       ├── 06_var_extended_evaluation.R    #
+│       ├── 07_var_extended_diagnostics.R   # 
+│   └── 02 bvar models/
 │       ├── 01_bvar_baseline.R               #
-│       ├── 01_var_baseline_.R                # 
+│       
 ├── output/
 │   ├── figures/
 │   └── tables/
