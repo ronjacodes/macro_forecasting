@@ -211,7 +211,7 @@ ar_expanding <- function(y_full, dates_full, eval_start,
   bind_rows(rows)
 }
 
-# ── Helper: VAR expanding window forecast ────────────────────────────────────
+# ── Helper: VAR expanding window forecast (FIXED) ────────────────────────────
 var_expanding <- function(sname, p_var, eval_start, horizons) {
   s       <- samples[[sname]]
   rows    <- list()
@@ -233,7 +233,12 @@ var_expanding <- function(sname, p_var, eval_start, horizons) {
       
       dat_train  <- var_input[train_idx, ]
       exog_train <- exog_full[train_idx, , drop = FALSE]
-      n_train    <- nrow(dat_train)
+      
+      # FIX 1: Convert any NA values in the dummy matrix to 0 (protects full sample)
+      exog_train[is.na(exog_train)] <- 0
+      
+      # FIX 2: Identify which COVID dummies actually have 1s in this training window
+      valid_dummies <- colSums(exog_train) > 0
       
       # Build ts
       ts_start_q <- as.numeric(format(dat_train$date[1], "%Y"))
@@ -241,22 +246,35 @@ var_expanding <- function(sname, p_var, eval_start, horizons) {
       en <- ts(dat_train[, c("gdp_g","cpi_g","bond_dif")],
                start = c(ts_start_q, ts_start_m), frequency = 4)
       
-      # Fit VAR
-      mod <- tryCatch(
-        VAR(en, p = p_var, type = "const", exogen = exog_train),
-        error = function(e) NULL
-      )
+      # Fit VAR: Only use valid dummies, otherwise estimate a normal VAR
+      if (any(valid_dummies)) {
+        ex_tr <- exog_train[, valid_dummies, drop = FALSE]
+        mod <- tryCatch(
+          VAR(en, p = p_var, type = "const", exogen = ex_tr),
+          error = function(e) NULL
+        )
+      } else {
+        mod <- tryCatch(
+          VAR(en, p = p_var, type = "const"),
+          error = function(e) NULL
+        )
+      }
       if (is.null(mod)) next
       
-      # Forecast exog (all zeros — no COVID in forecast period)
-      exog_fc_h <- matrix(0, nrow = max(horizons), ncol = 8,
-                          dimnames = list(NULL, covid_cols))
-      
-      fc <- tryCatch(
-        predict(mod, n.ahead = max(horizons), ci = 0.95,
-                dumvar = exog_fc_h),
-        error = function(e) NULL
-      )
+      # Forecast: Match the valid dummies exactly
+      if (any(valid_dummies)) {
+        ex_fc_h <- matrix(0, nrow = max(horizons), ncol = sum(valid_dummies),
+                          dimnames = list(NULL, colnames(ex_tr)))
+        fc <- tryCatch(
+          predict(mod, n.ahead = max(horizons), ci = 0.95, dumvar = ex_fc_h),
+          error = function(e) NULL
+        )
+      } else {
+        fc <- tryCatch(
+          predict(mod, n.ahead = max(horizons), ci = 0.95),
+          error = function(e) NULL
+        )
+      }
       if (is.null(fc)) next
       
       # Extract h-step forecast for each variable
@@ -264,13 +282,13 @@ var_expanding <- function(sname, p_var, eval_start, horizons) {
         actual <- var_input[[vname]][target_i]
         fcst   <- fc$fcst[[vname]][h, "fcst"]
         rows[[length(rows) + 1]] <- tibble(
-          date   = var_input$date[target_i],
-          origin = var_input$date[i],
-          h      = h,
+          date     = var_input$date[target_i],
+          origin   = var_input$date[i],
+          h        = h,
           variable = vname,
-          fcst   = fcst,
-          actual = actual,
-          error  = actual - fcst
+          fcst     = fcst,
+          actual   = actual,
+          error    = actual - fcst
         )
       }
     }
@@ -468,7 +486,6 @@ cat("Reject H0 (p<0.05) → model is significantly better (or worse) than AR(1)\
 
 # Helper: DM test for one model vs AR(1) for one variable and horizon
 dm_test <- function(err_model, err_ar1, h_val) {
-  # Align on dates
   joined <- inner_join(
     err_model %>% filter(h == h_val) %>% select(date, e_model = error),
     err_ar1   %>% filter(h == h_val) %>% select(date, e_ar1   = error),
@@ -477,9 +494,8 @@ dm_test <- function(err_model, err_ar1, h_val) {
   
   if (nrow(joined) < 10) return(tibble(dm_stat = NA, p_value = NA, n = nrow(joined)))
   
-  d <- joined$e_model^2 - joined$e_ar1^2   # loss differential (MSE)
+  d <- joined$e_model^2 - joined$e_ar1^2 
   tryCatch({
-    # DM test: t-test on d with HAC standard errors
     dm    <- lm(d ~ 1)
     dm_hc <- coeftest(dm, vcov = sandwich::NeweyWest(dm, lag = h_val - 1))
     tibble(
@@ -490,8 +506,8 @@ dm_test <- function(err_model, err_ar1, h_val) {
   }, error = function(e) tibble(dm_stat = NA, p_value = NA, n = nrow(joined)))
 }
 
-# Run DM tests for best VAR models vs AR(1) at all horizons
-best_var_ids <- c("VAR_full_p1", "VAR_post08_p3", "VAR_post15_p1")
+# FIX: Dynamically grab all VAR models that successfully generated forecasts
+best_var_ids <- names(forecast_errors)[grepl("^VAR_", names(forecast_errors))]
 
 dm_results <- list()
 for (mid in best_var_ids) {
@@ -510,37 +526,42 @@ for (mid in best_var_ids) {
   }
 }
 
-dm_table <- bind_rows(dm_results) %>%
-  mutate(
-    significant = case_when(
-      is.na(p_value)   ~ "n/a",
-      p_value <= 0.01  ~ "*** (1%)",
-      p_value <= 0.05  ~ "**  (5%)",
-      p_value <= 0.10  ~ "*   (10%)",
-      TRUE             ~ "—"
-    ),
-    direction = case_when(
-      is.na(dm_stat)  ~ "n/a",
-      dm_stat < 0     ~ "VAR better",
-      dm_stat > 0     ~ "AR1 better",
-      TRUE            ~ "—"
+dm_table <- bind_rows(dm_results)
+
+# FIX: Safety check to ensure dm_table isn't empty before mutating
+if (nrow(dm_table) > 0) {
+  dm_table <- dm_table %>%
+    mutate(
+      significant = case_when(
+        is.na(p_value)   ~ "n/a",
+        p_value <= 0.01  ~ "*** (1%)",
+        p_value <= 0.05  ~ "** (5%)",
+        p_value <= 0.10  ~ "* (10%)",
+        TRUE             ~ "—"
+      ),
+      direction = case_when(
+        is.na(dm_stat)  ~ "n/a",
+        dm_stat < 0     ~ "VAR better",
+        dm_stat > 0     ~ "AR1 better",
+        TRUE            ~ "—"
+      )
     )
-  )
-
-cat("── GDP ─────────────────────────────────────────────────────────────\n")
-dm_table %>% filter(variable == "gdp_g") %>%
-  select(model, h, dm_stat, p_value, significant, direction) %>%
-  print(n = Inf, width = Inf)
-
-cat("\n── CPI ─────────────────────────────────────────────────────────────\n")
-dm_table %>% filter(variable == "cpi_g") %>%
-  select(model, h, dm_stat, p_value, significant, direction) %>%
-  print(n = Inf, width = Inf)
-
-cat("\n── Bond yield ──────────────────────────────────────────────────────\n")
-dm_table %>% filter(variable == "bond_dif") %>%
-  select(model, h, dm_stat, p_value, significant, direction) %>%
-  print(n = Inf, width = Inf)
+  
+  cat("── GDP ─────────────────────────────────────────────────────────────\n")
+  print(dm_table %>% filter(variable == "gdp_g") %>%
+          select(model, h, dm_stat, p_value, significant, direction), n = Inf, width = Inf)
+  
+  cat("\n── CPI ─────────────────────────────────────────────────────────────\n")
+  print(dm_table %>% filter(variable == "cpi_g") %>%
+          select(model, h, dm_stat, p_value, significant, direction), n = Inf, width = Inf)
+  
+  cat("\n── Bond yield ──────────────────────────────────────────────────────\n")
+  print(dm_table %>% filter(variable == "bond_dif") %>%
+          select(model, h, dm_stat, p_value, significant, direction), n = Inf, width = Inf)
+  
+} else {
+  cat("\nNo DM tests could be calculated (insufficient overlap or missing forecasts).\n")
+}
 
 # ── 6. RMSE plots by horizon ──────────────────────────────────────────────────
 cat("\n══════════════════════════════════════════════════════════════════════\n")
@@ -592,13 +613,22 @@ for (covid_label in c("incl", "excl")) {
   p_cpi  <- make_rmse_plot(rmse_tbl, "cpi_g",    "CPI inflation",      covid_label)
   p_bond <- make_rmse_plot(rmse_tbl, "bond_dif", "Bond yield change",  covid_label)
   
+  # Combine the three plots
   fig <- (p_gdp / p_cpi / p_bond) +
     plot_layout(guides = "collect") +
     plot_annotation(
       title    = sprintf("Baseline VAR vs AR(1): RMSE by horizon (%s COVID)",
                          ifelse(covid_label == "incl", "including", "excluding")),
       theme = theme(plot.title = element_text(size = 13, face = "bold"))
-    )
+    ) & 
+    # Use the '&' operator to apply these settings to the combined patchwork figure
+    theme(
+      legend.position = "bottom",
+      legend.direction = "horizontal",
+      legend.margin = margin(t = 0, b = 0)
+    ) &
+    # Force the legend into exactly 2 rows
+    guides(colour = guide_legend(nrow = 2, byrow = TRUE))
   
   print(fig)
   
@@ -622,3 +652,4 @@ for (covid_label in c("incl", "excl")) {
 #           row.names = FALSE)
 
 cat("\nEvaluation complete.\n")
+
