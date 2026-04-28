@@ -19,20 +19,20 @@
 #   FX — export competitiveness, imported inflation
 #     swxsfec_          : CHF/EUR (QoQ %) — dominant trade relationship
 #
-#   Euro Area — confirmed by prof as important (circled in meeting notes)
+#   Euro Area — confirmed by Prof. Rathke as important (in meeting)
 #     ekeusesig         : EA Economic Sentiment Indicator (level)
 #     bdiptot_g         : German IP (QoQ %) — collinear with EA ESI, for comparison
 #     empmim_hq         : EA PMI manufacturing (level) — collinear, for comparison
 #
-#   World demand (Welt Nachfrage) — global cycle proxy
+#   World demand — global cycle proxy
 #     mswrld_d_         : MSCI World equity index (QoQ %) — best available proxy
 #                         No trade-weighted world GDP series in dataset
 #
-#   Labour market (Arbeitsmarkt) — flagged by prof as important
+#   Labour market
 #     swun_p_totq       : Swiss unemployment rate, SA (level) — stationary ✓
 #                         Also a candidate as 4th target variable
 #
-#   Price measures / deflators (Preisvasse, Deflatoren)
+#   Price measures / deflators
 #     swimpprce         : Import prices (QoQ %) — FX/oil transmission into prices
 #     swproprce         : Producer Price Index (QoQ %) — upstream price pressure
 #     swppingdf         : Producer & Import PPI, domestic (QoQ %) — combined measure
@@ -473,3 +473,4 @@ selection_summary %>%
 
 cat("\nSelection complete. Update planned variable sets in header and\n")
 cat("proceed to 05_var_extended.R.\n")
+
