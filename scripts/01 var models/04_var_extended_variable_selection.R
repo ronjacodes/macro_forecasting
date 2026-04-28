@@ -1,5 +1,5 @@
 # ============================================================================
-# scripts/models/04_var_extended_selection.R
+# scripts/models/04_var_extended_variable_selection.R
 #
 # PURPOSE:
 #   Identify and evaluate candidate predictor variables to add to the
