@@ -5,7 +5,7 @@
 #   Estimate extended VARX models adding candidate predictors one at a time
 #   and in combinations to the 3-variable baseline (GDP, CPI, bond yield).
 #   Oil price (Brent) is included as EXOGENOUS in ALL models, alongside
-#   the COVID dummies — per Prof. Rathke's instruction.
+#   the COVID dummies.
 #
 # REQUIRES:
 #   source("scripts/exploration/00_setup.R")
@@ -24,7 +24,6 @@
 # EXOGENOUS VARIABLES:
 #   Always: 8 COVID dummies (carried over from baseline)
 #   When oil is included in a set: oilbren (Brent crude, QoQ %) added to exogen=
-#   Per prof: when oil IS included, it must be exogenous — not endogenous
 #   Sets without oil: use only COVID dummies as exogen (same as baseline)
 #
 # MODEL GRID:
@@ -633,3 +632,4 @@ cat("\nScript complete.\n")
 cat(sprintf("Objects: ext_results (%d sets) | summary_tbl (%d rows)\n",
             length(ext_results), nrow(summary_tbl)))
 cat("Next: 06_var_extended_evaluation.R\n")
+
