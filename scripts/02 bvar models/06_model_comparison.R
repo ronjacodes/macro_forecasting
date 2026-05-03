@@ -518,4 +518,3 @@ print(fig_fc)
 
 cat("\nModel comparison complete.\n")
 cat("Key objects: all_comp | fc_comparison | fig_heat | fig_fc\n")
-cat("Next: prepare presentation slides\n")
