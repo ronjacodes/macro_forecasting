@@ -42,15 +42,41 @@
 #   source("scripts/models/bvar/05_bvar_extended_evaluation.R")
 #     — ext_bvar_rmse (optional, recomputed here if not available)
 #
-# KEY FINDINGS (fill in after running):
-#   3-var block:
-#     GDP  h=1: AR(1) wins | BVAR baseline close | VAR baseline worst
-#     CPI  h=4: VAR baseline beats AR(1) | BVAR baseline similar
-#     Bond h=8: VAR baseline beats AR(1) | BVAR baseline similar
-#   Extended block:
-#     CPI/Bond: VARX extended clearly wins (but small n caveat)
-#     GDP: no model reliably beats AR(1)
-#   Q1 2026 consensus: GDP ~+0.3-0.4%, CPI ~0%, Bond ~-0.1pp
+# KEY FINDINGS:
+#
+#   3-variable baseline (VAR vs BVAR, same variables):
+#     GDP: neither beats AR(1) excl-COVID — VAR 103-120%, BVAR ~114%
+#          BVAR GDP ratio inflated by COVID inclusion (4.28x at h=1!)
+#     CPI: VAR clearly beats AR(1) at h=4,8 (80%, 45%)
+#          BVAR near-identical to AR(1) at h=4,8 (97%, 101%)
+#          → VAR wins for CPI at medium-long horizons
+#     Bond: VAR clearly beats AR(1) at h=4,8 (80%, 45%)
+#           BVAR near-identical to AR(1) (98%, 101%)
+#           → VAR wins for bond at medium-long horizons
+#     → BVAR baseline does NOT improve on VAR baseline for any target
+#       The Minnesota prior shrinks too aggressively for CPI/bond dynamics
+#
+#   Extended models (VARX vs BVAR extended):
+#     VARX dominates across all targets at all horizons
+#     Bond: VARX 0.79/0.47/0.40/0.29 of AR(1) — extraordinary improvement
+#     CPI:  VARX 0.86/0.63/0.49/0.35 of AR(1) — large improvement
+#     GDP:  VARX 1.24/1.03/1.26/1.26 — no improvement, slightly worse
+#     BVAR extended: marginal improvement over baseline BVAR at h=4 bond
+#                    (0.91) but worse than VARX everywhere
+#     → VARX is the clear winner for CPI and bond forecasting
+#     → Bayesian shrinkage prevents extended BVAR from exploiting the
+#       same signal that VARX captures with additional variables
+#
+#   Q1 2026 consensus:
+#     GDP:  +0.29% to +0.46% — all models agree on positive growth
+#           AR(1) lowest, BVAR highest; spread is narrow
+#     CPI:  -0.08% to +0.16% — near-zero across all models
+#           AR(1) slightly positive (+0.16%), VAR slightly negative (-0.08%)
+#           BVAR near zero (+0.01%) — consistent Swiss disinflation signal
+#     Bond: -0.53pp to -0.09pp — VAR baseline is outlier (-0.53pp)
+#           BVAR baseline and extended agree at -0.09pp
+#           VARX CPI/bond values missing (NA) — model not available for h=1
+#     → Robust consensus: GDP ~+0.35-0.45%, CPI ~0%, Bond ~-0.09pp
 #
 # STRUCTURE:
 #   Section 1 — 3-variable baseline RMSE comparison
@@ -451,3 +477,4 @@ print(fig_fc)
 
 cat("\nModel comparison complete.\n")
 cat("Key objects: all_comp | fc_comparison | fig_heat | fig_fc\n")
+cat("Next: prepare presentation slides\n")
