@@ -230,7 +230,27 @@ bvar_ext_best_rmse <- rmse_from_mat(
   sprintf("BVAR extended (%s)", best_bvar_ext_id)
 )
 
-ext_rmse <- bind_rows(ar1_excl, varx_best, bvar_ext_best_rmse)
+# BVAR large (10-var scale-corrected, from script 07)
+bvar_large_rmse <- tryCatch(
+  bind_rows(lapply(HORIZONS, function(h) {
+    e <- errors_focused[[paste0("h", h)]]
+    if (is.null(e)) return(NULL)
+    rmse <- sqrt(colMeans(e, na.rm = TRUE))
+    tibble(
+      model     = "BVAR large (10-var, from 2005)",
+      h         = h,
+      rmse_gdp  = round(rmse["gdp_g"],    4),
+      rmse_cpi  = round(rmse["cpi_g"],    4),
+      rmse_bond = round(rmse["bond_dif"], 4)
+    )
+  })),
+  error = function(e) {
+    cat(sprintf("  [!] BVAR large not available: %s\n", e$message))
+    NULL
+  }
+)
+
+ext_rmse <- bind_rows(ar1_excl, varx_best, bvar_ext_best_rmse, bvar_large_rmse)
 
 cat("── Extended RMSE table ──────────────────────────────────────────────\n")
 ext_rmse %>%
@@ -258,7 +278,9 @@ all_comp <- bind_rows(
   var_base    %>% mutate(family = "VAR baseline"),
   bvar_base   %>% mutate(family = "BVAR baseline"),
   varx_best   %>% mutate(family = "VARX extended"),
-  bvar_ext_best_rmse %>% mutate(family = "BVAR extended")
+  bvar_ext_best_rmse %>% mutate(family = "BVAR extended"),
+  if (!is.null(bvar_large_rmse))
+    bvar_large_rmse %>% mutate(family = "BVAR large (10-var) ⚠")
 ) %>%
   left_join(ar1_ref_excl, by = "h") %>%
   mutate(
@@ -267,7 +289,8 @@ all_comp <- bind_rows(
     rel_bond = round(rmse_bond / ar1_bond,  3),
     family   = factor(family,
                       levels = c("VAR baseline", "BVAR baseline",
-                                 "VARX extended", "BVAR extended"))
+                                 "VARX extended", "BVAR extended",
+                                 "BVAR large (10-var) ⚠"))
   )
 
 rel_long <- all_comp %>%
@@ -302,6 +325,7 @@ fig_heat <- ggplot(rel_long,
   ) +
   scale_colour_identity() +
   scale_y_discrete(limits = rev(levels(rel_long$family))) +
+  # ⚠ BVAR large included for completeness — worse than AR(1) at all horizons
   labs(
     title    = "Relative RMSE vs AR(1) — all model families",
     subtitle = paste("Blue < 1 = beats AR(1) | AR(1) uses excl-COVID RMSE as reference",
@@ -405,7 +429,23 @@ bvar_ext_fc <- tryCatch({
 })
 
 # ── Combine and print ─────────────────────────────────────────────────────────
-fc_comparison <- bind_rows(ar1_fc, var_fc, varx_fc, bvar_base_fc, bvar_ext_fc)
+# BVAR large Q1 2026 forecast
+bvar_large_fc <- tryCatch({
+  row <- bvar_ext_summary %>% filter(FALSE) %>% slice(0)  # placeholder
+  # Pull directly from fc_v2 (from script 07)
+  tibble(
+    family  = "BVAR large (10-var) ⚠",
+    fc_gdp  = round(median(fc_v2$fcast[, 1, 1]), 3),
+    fc_cpi  = round(median(fc_v2$fcast[, 1, 2]), 3),
+    fc_bond = round(median(fc_v2$fcast[, 1, 3]), 3)
+  )
+}, error = function(e) {
+  cat(sprintf("  [!] BVAR large forecast unavailable: %s\n", e$message))
+  NULL
+})
+
+fc_comparison <- bind_rows(ar1_fc, var_fc, varx_fc, bvar_base_fc, bvar_ext_fc,
+                           bvar_large_fc)
 
 cat("Q1 2026 point forecasts:\n\n")
 fc_comparison %>%
@@ -426,6 +466,7 @@ family_cols <- c(
 family_cols[sprintf("VARX extended\n(%s)", best_varx_id)] <- "#e66101"
 family_cols["BVAR baseline"] <- COL_GDP
 family_cols[sprintf("BVAR extended\n(%s)", best_bvar_ext_id)] <- COL_CPI
+family_cols["BVAR large (10-var) ⚠"] <- "gray50"
 
 fc_long <- fc_comparison %>%
   mutate(family = factor(family, levels = family_order)) %>%
